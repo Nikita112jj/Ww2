@@ -1,0 +1,224 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Players, RunService, Lighting, ReplicatedStorage, Workspace = game:GetService("Players"), game:GetService("RunService"), game:GetService("Lighting"), game:GetService("ReplicatedStorage"), game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+local AutoShootEnabled = false
+local GodModeEnabled = false
+local SpeedBoostEnabled = false
+local AutoReloadEnabled = false
+local AimbotEnabled = false
+local TeamCheckEnabled = true
+local ShootDistance = 15
+local AimDistance = 15
+local Weapons = {"STG-44","AK-47","Mauser"}
+
+local Window = Rayfield:CreateWindow({
+    Name = "WW2 Script",
+    LoadingTitle = "WW2",
+    LoadingSubtitle = "by Neked",
+})
+
+local PlayerTab = Window:CreateTab("Player")
+local AimTab = Window:CreateTab("AimBot")
+
+PlayerTab:CreateToggle({
+    Name = "Auto Shoot",
+    CurrentValue = false,
+    Callback = function(v) AutoShootEnabled = v end
+})
+
+PlayerTab:CreateToggle({
+    Name = "God Mode",
+    CurrentValue = false,
+    Callback = function(v) GodModeEnabled = v end
+})
+
+PlayerTab:CreateToggle({
+    Name = "SpeedBoost",
+    CurrentValue = false,
+    Callback = function(v) SpeedBoostEnabled = v end
+})
+
+PlayerTab:CreateToggle({
+    Name = "Auto Reload",
+    CurrentValue = false,
+    Callback = function(v) AutoReloadEnabled = v end
+})
+
+PlayerTab:CreateSlider({
+    Name = "Shoot Distance",
+    Range = {15,100},
+    Increment = 1,
+    CurrentValue = 15,
+    Callback = function(v) ShootDistance = v end
+})
+
+AimTab:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Callback = function(v) AimbotEnabled = v end
+})
+
+AimTab:CreateToggle({
+    Name = "Team Check",
+    CurrentValue = true,
+    Callback = function(v) TeamCheckEnabled = v end
+})
+
+AimTab:CreateSlider({
+    Name = "Aim Distance",
+    Range = {15,150},
+    Increment = 1,
+    CurrentValue = 15,
+    Callback = function(v) AimDistance = v end
+})
+
+task.spawn(function()
+    for _, p in ipairs(workspace:GetDescendants()) do
+        if p:IsA("ProximityPrompt") then
+            p.HoldDuration = 0
+        end
+    end
+    workspace.DescendantAdded:Connect(function(d)
+        if d:IsA("ProximityPrompt") then
+            d.HoldDuration = 0
+        end
+    end)
+end)
+
+local function applyESP(plr)
+    if not plr.Character then return end
+    for _, part in ipairs(plr.Character:GetChildren()) do
+        if part:IsA("BasePart") then
+            local box = part:FindFirstChild("ESP")
+            if not box then
+                box = Instance.new("BoxHandleAdornment")
+                box.Name = "ESP"
+                box.Adornee = part
+                box.AlwaysOnTop = true
+                box.ZIndex = 5
+                box.Size = part.Size + Vector3.new(0.05,0.05,0.05)
+                box.Transparency = 0.5
+                box.Parent = part
+            end
+            box.Color3 = plr.Team and plr.Team.TeamColor.Color or Color3.new(1,0,0)
+        end
+    end
+end
+
+task.spawn(function()
+    while task.wait(0.5) do
+        for _,plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then
+                applyESP(plr)
+            end
+        end
+    end
+end)
+
+local function getNearestEnemy(maxDist, forAim)
+    local closest, dist = nil, math.huge
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if (not TeamCheckEnabled and forAim) or plr.Team ~= LocalPlayer.Team then
+                local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    local root = plr.Character.HumanoidRootPart
+                    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if myRoot then
+                        local mag = (myRoot.Position - root.Position).Magnitude
+                        if mag < dist and mag <= maxDist then
+                            dist = mag
+                            closest = root
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return closest, dist
+end
+
+task.spawn(function()
+    while task.wait(0.0000001) do
+        if GodModeEnabled then
+            ReplicatedStorage:WaitForChild("HealEvent"):FireServer()
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.01) do
+        if AutoShootEnabled then
+            local char = LocalPlayer.Character
+            if char then
+                for _,w in ipairs(Weapons) do
+                    local gun = char:FindFirstChild(w)
+                    if gun and gun:FindFirstChild("Remotes") then
+                        local shoot = gun.Remotes:FindFirstChild("ShootEvent")
+                        local target = getNearestEnemy(ShootDistance, false)
+                        if target and shoot then
+                            local dir = (target.Position - char.HumanoidRootPart.Position).Unit
+                            shoot:FireServer(target.Position, dir, workspace:WaitForChild("Terrain"))
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(2) do
+        if AutoReloadEnabled then
+            local char = LocalPlayer.Character
+            if char then
+                for _,w in ipairs(Weapons) do
+                    local gun = char:FindFirstChild(w)
+                    if gun and gun:FindFirstChild("Remotes") then
+                        local reload = gun.Remotes:FindFirstChild("ReloadEvent")
+                        if reload then reload:FireServer() end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait() do
+        if SpeedBoostEnabled then
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 100
+            end
+        else
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait() do
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 12
+        Lighting.FogEnd = 1e6
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.01) do
+        if AimbotEnabled then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local target = getNearestEnemy(AimDistance, true)
+                if target then
+                    Workspace.CurrentCamera.CFrame = CFrame.new(Workspace.CurrentCamera.CFrame.Position, target.Position)
+                end
+            end
+        end
+    end
+end)
