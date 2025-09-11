@@ -8,6 +8,7 @@ local SpeedBoostEnabled = false
 local AutoReloadEnabled = false
 local AimbotEnabled = false
 local TeamCheckEnabled = true
+local KillEveryoneEnabled = false
 local ShootDistance = 15
 local AimDistance = 15
 local Weapons = {"STG-44","AK-47","Mauser"}
@@ -21,68 +22,44 @@ local Window = Rayfield:CreateWindow({
 local PlayerTab = Window:CreateTab("Player")
 local AimTab = Window:CreateTab("AimBot")
 
-PlayerTab:CreateToggle({
-    Name = "Auto Shoot",
-    CurrentValue = false,
-    Callback = function(v) AutoShootEnabled = v end
+PlayerTab:CreateToggle({Name = "Auto Shoot", CurrentValue = false, Callback = function(v) AutoShootEnabled = v end})
+PlayerTab:CreateToggle({Name = "God Mode", CurrentValue = false, Callback = function(v) GodModeEnabled = v end})
+PlayerTab:CreateToggle({Name = "SpeedBoost", CurrentValue = false, Callback = function(v) SpeedBoostEnabled = v end})
+PlayerTab:CreateToggle({Name = "Auto Reload", CurrentValue = false, Callback = function(v) AutoReloadEnabled = v end})
+PlayerTab:CreateSlider({Name = "Shoot Distance", Range = {15,100}, Increment = 1, CurrentValue = 15, Callback = function(v) ShootDistance = v end})
+
+PlayerTab:CreateButton({
+    Name = "Inf Ammo",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if char then
+            for _,w in ipairs(Weapons) do
+                local gun = char:FindFirstChild(w)
+                if gun and gun:FindFirstChild("Remotes") then
+                    local reload = gun.Remotes:FindFirstChild("ReloadEvent")
+                    if reload then reload:FireServer(1e+1000) end
+                end
+            end
+        end
+    end
 })
 
 PlayerTab:CreateToggle({
-    Name = "God Mode",
+    Name = "Kill Everyone",
     CurrentValue = false,
-    Callback = function(v) GodModeEnabled = v end
+    Callback = function(v) KillEveryoneEnabled = v end
 })
 
-PlayerTab:CreateToggle({
-    Name = "SpeedBoost",
-    CurrentValue = false,
-    Callback = function(v) SpeedBoostEnabled = v end
-})
-
-PlayerTab:CreateToggle({
-    Name = "Auto Reload",
-    CurrentValue = false,
-    Callback = function(v) AutoReloadEnabled = v end
-})
-
-PlayerTab:CreateSlider({
-    Name = "Shoot Distance",
-    Range = {15,100},
-    Increment = 1,
-    CurrentValue = 15,
-    Callback = function(v) ShootDistance = v end
-})
-
-AimTab:CreateToggle({
-    Name = "Aimbot",
-    CurrentValue = false,
-    Callback = function(v) AimbotEnabled = v end
-})
-
-AimTab:CreateToggle({
-    Name = "Team Check",
-    CurrentValue = true,
-    Callback = function(v) TeamCheckEnabled = v end
-})
-
-AimTab:CreateSlider({
-    Name = "Aim Distance",
-    Range = {15,150},
-    Increment = 1,
-    CurrentValue = 15,
-    Callback = function(v) AimDistance = v end
-})
+AimTab:CreateToggle({Name = "Aimbot", CurrentValue = false, Callback = function(v) AimbotEnabled = v end})
+AimTab:CreateToggle({Name = "Team Check", CurrentValue = true, Callback = function(v) TeamCheckEnabled = v end})
+AimTab:CreateSlider({Name = "Aim Distance", Range = {15,150}, Increment = 1, CurrentValue = 15, Callback = function(v) AimDistance = v end})
 
 task.spawn(function()
     for _, p in ipairs(workspace:GetDescendants()) do
-        if p:IsA("ProximityPrompt") then
-            p.HoldDuration = 0
-        end
+        if p:IsA("ProximityPrompt") then p.HoldDuration = 0 end
     end
     workspace.DescendantAdded:Connect(function(d)
-        if d:IsA("ProximityPrompt") then
-            d.HoldDuration = 0
-        end
+        if d:IsA("ProximityPrompt") then d.HoldDuration = 0 end
     end)
 end)
 
@@ -109,9 +86,7 @@ end
 task.spawn(function()
     while task.wait(0.5) do
         for _,plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                applyESP(plr)
-            end
+            if plr ~= LocalPlayer then applyESP(plr) end
         end
     end
 end)
@@ -217,6 +192,22 @@ task.spawn(function()
                 local target = getNearestEnemy(AimDistance, true)
                 if target then
                     Workspace.CurrentCamera.CFrame = CFrame.new(Workspace.CurrentCamera.CFrame.Position, target.Position)
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.05) do
+        if KillEveryoneEnabled then
+            for _,plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health > 0 then
+                        local pos = plr.Character.HumanoidRootPart.Position
+                        ReplicatedStorage:WaitForChild("PlaceMineEvent"):FireServer(pos, CFrame.new(pos))
+                    end
                 end
             end
         end
