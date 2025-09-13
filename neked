@@ -1,5 +1,5 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local Players, RunService, Lighting, ReplicatedStorage, Workspace = game:GetService("Players"), game:GetService("RunService"), game:GetService("Lighting"), game:GetService("ReplicatedStorage"), game:GetService("Workspace")
+local Players, RunService, Lighting, ReplicatedStorage, Workspace, UserInputService = game:GetService("Players"), game:GetService("RunService"), game:GetService("Lighting"), game:GetService("ReplicatedStorage"), game:GetService("Workspace"), game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
 local AutoShootEnabled = false
@@ -9,16 +9,13 @@ local AutoReloadEnabled = false
 local AimbotEnabled = false
 local TeamCheckEnabled = true
 local KillEveryoneEnabled = false
+local AutoInfAmmoEnabled = false
+local InfJumpEnabled = false
 local ShootDistance = 15
 local AimDistance = 15
 local Weapons = {"STG-44","AK-47","Mauser"}
 
-local Window = Rayfield:CreateWindow({
-    Name = "WW2 Script",
-    LoadingTitle = "WW2",
-    LoadingSubtitle = "by Neked",
-})
-
+local Window = Rayfield:CreateWindow({Name = "WW2 Script",LoadingTitle = "WW2",LoadingSubtitle = "by Neked"})
 local PlayerTab = Window:CreateTab("Player")
 local AimTab = Window:CreateTab("AimBot")
 
@@ -26,10 +23,12 @@ PlayerTab:CreateToggle({Name = "Auto Shoot", CurrentValue = false, Callback = fu
 PlayerTab:CreateToggle({Name = "God Mode", CurrentValue = false, Callback = function(v) GodModeEnabled = v end})
 PlayerTab:CreateToggle({Name = "SpeedBoost", CurrentValue = false, Callback = function(v) SpeedBoostEnabled = v end})
 PlayerTab:CreateToggle({Name = "Auto Reload", CurrentValue = false, Callback = function(v) AutoReloadEnabled = v end})
+PlayerTab:CreateToggle({Name = "Auto Inf Ammo", CurrentValue = false, Callback = function(v) AutoInfAmmoEnabled = v end})
+PlayerTab:CreateToggle({Name = "Inf Jump", CurrentValue = false, Callback = function(v) InfJumpEnabled = v end})
 PlayerTab:CreateSlider({Name = "Shoot Distance", Range = {15,100}, Increment = 1, CurrentValue = 15, Callback = function(v) ShootDistance = v end})
 
 PlayerTab:CreateButton({
-    Name = "Inf Ammo",
+    Name = "Inf Ammo (One-Time)",
     Callback = function()
         local char = LocalPlayer.Character
         if char then
@@ -44,10 +43,21 @@ PlayerTab:CreateButton({
     end
 })
 
-PlayerTab:CreateToggle({
-    Name = "Kill Everyone",
-    CurrentValue = false,
-    Callback = function(v) KillEveryoneEnabled = v end
+PlayerTab:CreateToggle({Name = "Kill Everyone (Loop Mines)", CurrentValue = false, Callback = function(v) KillEveryoneEnabled = v end})
+PlayerTab:CreateToggle({Name = "Team Check", CurrentValue = true, Callback = function(v) TeamCheckEnabled = v end})
+
+PlayerTab:CreateButton({
+    Name = "Kill All Enemies (One-Time)",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        for _,plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and (not TeamCheckEnabled or plr.Team ~= LocalPlayer.Team) and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local pos = plr.Character.HumanoidRootPart.Position
+                ReplicatedStorage:WaitForChild("PlaceMineEvent"):FireServer(pos, CFrame.new(pos))
+            end
+        end
+    end
 })
 
 AimTab:CreateToggle({Name = "Aimbot", CurrentValue = false, Callback = function(v) AimbotEnabled = v end})
@@ -55,12 +65,8 @@ AimTab:CreateToggle({Name = "Team Check", CurrentValue = true, Callback = functi
 AimTab:CreateSlider({Name = "Aim Distance", Range = {15,150}, Increment = 1, CurrentValue = 15, Callback = function(v) AimDistance = v end})
 
 task.spawn(function()
-    for _, p in ipairs(workspace:GetDescendants()) do
-        if p:IsA("ProximityPrompt") then p.HoldDuration = 0 end
-    end
-    workspace.DescendantAdded:Connect(function(d)
-        if d:IsA("ProximityPrompt") then d.HoldDuration = 0 end
-    end)
+    for _, p in ipairs(workspace:GetDescendants()) do if p:IsA("ProximityPrompt") then p.HoldDuration = 0 end end
+    workspace.DescendantAdded:Connect(function(d) if d:IsA("ProximityPrompt") then d.HoldDuration = 0 end end)
 end)
 
 local function applyESP(plr)
@@ -85,9 +91,7 @@ end
 
 task.spawn(function()
     while task.wait(0.5) do
-        for _,plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then applyESP(plr) end
-        end
+        for _,plr in ipairs(Players:GetPlayers()) do if plr ~= LocalPlayer then applyESP(plr) end end
     end
 end)
 
@@ -95,17 +99,14 @@ local function getNearestEnemy(maxDist, forAim)
     local closest, dist = nil, math.huge
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            if (not TeamCheckEnabled and forAim) or plr.Team ~= LocalPlayer.Team then
+            if (not TeamCheckEnabled and forAim) or (TeamCheckEnabled and plr.Team ~= LocalPlayer.Team) then
                 local hum = plr.Character:FindFirstChildOfClass("Humanoid")
                 if hum and hum.Health > 0 then
                     local root = plr.Character.HumanoidRootPart
                     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                     if myRoot then
                         local mag = (myRoot.Position - root.Position).Magnitude
-                        if mag < dist and mag <= maxDist then
-                            dist = mag
-                            closest = root
-                        end
+                        if mag < dist and mag <= maxDist then dist = mag closest = root end
                     end
                 end
             end
@@ -161,6 +162,30 @@ task.spawn(function()
 end)
 
 task.spawn(function()
+    while task.wait(0.00001) do
+        if AutoInfAmmoEnabled then
+            local char = LocalPlayer.Character
+            if char then
+                for _,w in ipairs(Weapons) do
+                    local gun = char:FindFirstChild(w)
+                    if gun and gun:FindFirstChild("Remotes") then
+                        local reload = gun.Remotes:FindFirstChild("ReloadEvent")
+                        if reload then reload:FireServer(1e+1000) end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Inf Jump
+UserInputService.JumpRequest:Connect(function()
+    if InfJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+task.spawn(function()
     while task.wait() do
         if SpeedBoostEnabled then
             if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
@@ -190,9 +215,7 @@ task.spawn(function()
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
                 local target = getNearestEnemy(AimDistance, true)
-                if target then
-                    Workspace.CurrentCamera.CFrame = CFrame.new(Workspace.CurrentCamera.CFrame.Position, target.Position)
-                end
+                if target then Workspace.CurrentCamera.CFrame = CFrame.new(Workspace.CurrentCamera.CFrame.Position, target.Position) end
             end
         end
     end
@@ -202,12 +225,9 @@ task.spawn(function()
     while task.wait(0.05) do
         if KillEveryoneEnabled then
             for _,plr in ipairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-                    if hum and hum.Health > 0 then
-                        local pos = plr.Character.HumanoidRootPart.Position
-                        ReplicatedStorage:WaitForChild("PlaceMineEvent"):FireServer(pos, CFrame.new(pos))
-                    end
+                if plr ~= LocalPlayer and (not TeamCheckEnabled or plr.Team ~= LocalPlayer.Team) and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local pos = plr.Character.HumanoidRootPart.Position
+                    ReplicatedStorage:WaitForChild("PlaceMineEvent"):FireServer(pos, CFrame.new(pos))
                 end
             end
         end
