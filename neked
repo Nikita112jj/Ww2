@@ -8,7 +8,7 @@ local AutoShootEnabled, GodModeEnabled, SpeedBoostEnabled, AutoReloadEnabled, Ai
 local TeamCheckEnabled, KillEveryoneEnabled, AutoInfAmmoEnabled, InfJumpEnabled = true, false, false, false
 local LoopKillPlayerEnabled, KillMyTeamLoopEnabled, EspEnabled, FullBrightEnabled, EspNameEnabled = false, false, false, false, false
 local ShootDistance, AimDistance, SelectedPlayer = 15, 15, ""
-local Weapons = {"STG-44","AK-47","Mauser"}
+local Weapons = {"STG-44","AK-47","Mauser","MG-42"}
 
 local Window = Rayfield:CreateWindow({Name = "WW2 Script",LoadingTitle = "WW2",LoadingSubtitle = "by Neked"})
 local PlayerTab, AimTab, KillTab, VisualTab = Window:CreateTab("Player"), Window:CreateTab("AimBot"), Window:CreateTab("Kill"), Window:CreateTab("Visual")
